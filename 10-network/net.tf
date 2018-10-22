@@ -61,7 +61,6 @@ resource "aws_route_table" "def_route_pub" {
 resource "aws_route_table_association" "def_igw" {
   route_table_id = "${aws_route_table.def_route_pub.id}"
   count = "${var.count}"
-#  count = "${length(var.vpc_zones)}"
   subnet_id = "${element(aws_subnet.public_net.*.id, count.index)}"
 }
 

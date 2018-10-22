@@ -11,6 +11,18 @@ resource "aws_security_group" "bastion_sg" {
   }
   # Allow ICMP
   ingress {
+    from_port = 80
+    protocol = "tcp"
+    to_port = 80
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  ingress {
+    from_port = 443
+    protocol = "tcp"
+    to_port = 443
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  ingress {
     from_port = -1
     protocol = "icmp"
     to_port = -1

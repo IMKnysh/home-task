@@ -12,7 +12,8 @@ resource "aws_instance" "consul" {
   tags = "${merge(
     local.common_tags,
     map(
-      "Name", "${var.project_name}.consul"
+      "Name", "${var.project_name}.consul",
+      "Tag", "Consul-srv"
     )
   )}"
 }
