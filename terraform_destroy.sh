@@ -1,0 +1,1 @@
+terraform destroy $(for r in `terraform state list | grep -v module.network.aws_vpc | grep -v module.network.aws_subnet | grep -v module.network.aws_security_group | grep -v module.app.aws_s3_bucket | grep -v module.network.aws_internet_gateway.igw`; do printf ' -target %s' ${r}; done)
