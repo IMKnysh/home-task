@@ -9,18 +9,6 @@ resource "aws_security_group" "bastion_sg" {
     to_port = 22
     cidr_blocks = ["0.0.0.0/0"]
   }
-  ingress {
-    from_port = 80
-    protocol = "tcp"
-    to_port = 80
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  ingress {
-    from_port = 443
-    protocol = "tcp"
-    to_port = 443
-    cidr_blocks = ["0.0.0.0/0"]
-  }
   # Allow ICMP
   ingress {
     from_port = -1
@@ -53,26 +41,11 @@ resource "aws_security_group" "intra" {
       "Name", "${var.project_name}.intra_sg"
     )
   )}"
-  # Allow HTTP
-  ingress {
-    from_port = 80
-    protocol = "tcp"
-    to_port = 80
-    cidr_blocks = ["${aws_subnet.public_net.*.cidr_block}"]
-  }
-  # Allow HTTPS
-  ingress {
-    from_port = 443
-    protocol = "tcp"
-    to_port = 443
-    cidr_blocks = ["${aws_subnet.public_net.*.cidr_block}"]
-  }
   # SSH access from anywhere
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-#    cidr_blocks = ["${aws_subnet.private_net.*.cidr_block}"]
     security_groups = ["${aws_security_group.bastion_sg.id}"]
     self = true
   }

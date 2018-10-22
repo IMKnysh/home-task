@@ -48,14 +48,9 @@ module "network" {
   vpc_zones = ["${data.aws_availability_zones.available.names}"]
   count_app_instances = "${var.count_app_instances}"
   vpc_cidr = "${var.vpc_cidr}"
-#  route53_zone_id = "${var.route53_zone_id}"
-#  dns_name = "${var.dns_name}"
-#  s3bucket_id = "${module.S3.s3bucket_id}"
-#  private_subnet_instance = "${module.instances.private_subnet_instance}"
   count = "${var.count}"
   amis = "${data.aws_ami.compute.id}"
   instance_type_default = "${var.instance_type_default}"
   key_name = "${var.key_name}"
   amis_nat = "${data.aws_ami.nat_ami.id}"
-
 }

@@ -1,6 +1,5 @@
 resource "aws_instance" "consul" {
-  ami = "ami-0ff8a91507f77f867"
-#  ami = "${data.aws_ami.compute.id}"
+  ami = "${data.aws_ami.compute.id}"
   instance_type = "${var.instance_type_default}"
   count = "${var.count_app_instances}"
   subnet_id = "${element(module.network.private_subnet_id, count.index)}"
@@ -22,9 +21,6 @@ data "template_file" "consul" {
   template                    = "${file("templates/user_data.tmpl")}"
   vars {
     var.count_srv = "${var.count_app_instances}"
-#    var.aws_access_key        = "${var.aws_access_key}"
-#    var.aws_secret_access_key = "${var.aws_secret_access_key}"
-#    var.region                = "${var.region}"
   }
 }
 
