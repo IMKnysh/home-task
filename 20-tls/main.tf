@@ -4,7 +4,6 @@
 
 resource "tls_private_key" "ca" {
   algorithm   = "${var.private_key_algorithm}"
-  ecdsa_curve = "${var.private_key_ecdsa_curve}"
   rsa_bits    = "${var.private_key_rsa_bits}"
 }
 
@@ -17,13 +16,8 @@ resource "tls_self_signed_cert" "ca" {
   allowed_uses          = ["${var.ca_allowed_uses}"]
 
   subject {
-    common_name  = "${var.ca_common_name}"
+    common_name  = "${var.ca_common_name}, ${var.region}"
     organization = "${var.organization_name}"
-  }
-
-  # Store the CA public key in a file.
-  provisioner "local-exec" {
-    command = "echo '${tls_self_signed_cert.ca.cert_pem}' > '${var.ca_public_key_file_path}' && chmod ${var.permissions} '${var.ca_public_key_file_path}' && chown ${var.owner} '${var.ca_public_key_file_path}'"
   }
 }
 
@@ -33,13 +27,7 @@ resource "tls_self_signed_cert" "ca" {
 
 resource "tls_private_key" "cert" {
   algorithm   = "${var.private_key_algorithm}"
-  ecdsa_curve = "${var.private_key_ecdsa_curve}"
   rsa_bits    = "${var.private_key_rsa_bits}"
-
-  # Store the certificate's private key in a file.
-  provisioner "local-exec" {
-    command = "echo '${tls_private_key.cert.private_key_pem}' > '${var.private_key_file_path}' && chmod ${var.permissions} '${var.private_key_file_path}' && chown ${var.owner} '${var.private_key_file_path}'"
-  }
 }
 
 resource "tls_cert_request" "cert" {
@@ -55,7 +43,7 @@ resource "tls_cert_request" "cert" {
   }
 }
 
-resource "tls_locally_signed_cert" "cert" {
+resource "tls_locally_signed_cert" "cert_srv" {
   cert_request_pem = "${tls_cert_request.cert.cert_request_pem}"
 
   ca_key_algorithm   = "${tls_private_key.ca.algorithm}"
@@ -63,10 +51,5 @@ resource "tls_locally_signed_cert" "cert" {
   ca_cert_pem        = "${tls_self_signed_cert.ca.cert_pem}"
 
   validity_period_hours = "${var.validity_period_hours}"
-  allowed_uses          = ["${var.allowed_uses}"]
-
-  # Store the certificate's public key in a file.
-  provisioner "local-exec" {
-    command = "echo '${tls_locally_signed_cert.cert.cert_pem}' > '${var.public_key_file_path}' && chmod ${var.permissions} '${var.public_key_file_path}' && chown ${var.owner} '${var.public_key_file_path}'"
-  }
+  allowed_uses          = ["${var.allowed_uses_srv}"]
 }
