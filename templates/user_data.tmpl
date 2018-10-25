@@ -49,7 +49,7 @@ cat <<EOF > /opt/consul/agent.json
 EOF
 
 echo "${var.ca_public_key}" > /opt/consul/tls/certs/ca-bundle.crt
-echo "${var.public_key_srv}" > /opt/consul/tls/certs/server.crt
+echo "${var.public_key}" > /opt/consul/tls/certs/server.crt
 echo "${var.private_key}" > /opt/consul/tls/private/my.key
 
 inst_IP=`curl --silent --show-error --location http://169.254.169.254/latest/meta-data/local-ipv4/`
