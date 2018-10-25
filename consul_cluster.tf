@@ -12,8 +12,8 @@ resource "aws_instance" "consul" {
   tags = "${merge(
     local.common_tags,
     map(
-      "Name", "${var.project_name}.consul",
-      "Tag", "Consul-srv"
+      "Name", "${var.project_name}.consul-${count.index}",
+      "Consul", "Server"
     )
   )}"
 }
@@ -22,17 +22,16 @@ data "template_file" "consul" {
   template                    = "${file("templates/user_data.tmpl")}"
   vars {
     var.count_srv = "${var.count_app_instances}"
+    var.region = "${var.region}"
+    var.count.index = "${count.index}"
+    var.ca_public_key = "${module.tls.ca_public_key}"
+    var.public_key_srv = "${module.tls.public_key_srv}"
+    var.private_key = "${module.tls.private_key}"
+    var.consul_encrypt = "${random_id.consul_encrypt.b64_std}"
   }
 }
 
 data "template_cloudinit_config" "user_data" {
-  part {
-    content = <<EOF
-#cloud-config
----
-package_upgrade: true
-EOF
-  }
   part {
     filename = "consul_run.sh"
     content_type = "text/x-shellscript"
@@ -83,4 +82,8 @@ EOF
 resource "aws_iam_instance_profile" "ec2_descr_profile" {
   name = "ec2_descr_profile"
   role = "${aws_iam_role.ec2_describe_role.name}"
+}
+
+resource "random_id" "consul_encrypt" {
+    byte_length = 16
 }

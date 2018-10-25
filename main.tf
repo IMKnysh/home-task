@@ -54,3 +54,7 @@ module "network" {
   key_name = "${var.key_name}"
   amis_nat = "${data.aws_ami.nat_ami.id}"
 }
+module "tls" {
+  source = "./20-tls"
+  region = "${var.region}"
+}
