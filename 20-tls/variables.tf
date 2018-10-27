@@ -33,7 +33,7 @@ variable "ip_addresses" {
 
 variable "validity_period_hours" {
   description = "The number of hours after initial issuing that the certificate will become invalid."
-  default = "24"
+  default = "240"
 }
 
 # ---------------------------------------------------------------------------------------------------------------------

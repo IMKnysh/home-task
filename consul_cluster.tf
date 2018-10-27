@@ -23,11 +23,12 @@ data "template_file" "consul" {
   vars {
     var.count_srv = "${var.count_app_instances}"
     var.region = "${var.region}"
-    var.count.index = "${count.index}"
     var.ca_public_key = "${module.tls.ca_public_key}"
     var.public_key_srv = "${module.tls.public_key_srv}"
     var.private_key = "${module.tls.private_key}"
     var.consul_encrypt = "${random_id.consul_encrypt.b64_std}"
+    var.consul_acl_master_token = "${random_id.consul_acl_master_token.b64_url}"
+    var.consul_acl_agent_token = "${random_id.consul_acl_agent_token.b64_url}"
   }
 }
 
@@ -86,4 +87,11 @@ resource "aws_iam_instance_profile" "ec2_descr_profile" {
 
 resource "random_id" "consul_encrypt" {
     byte_length = 16
+}
+
+resource "random_id" "consul_acl_master_token" {
+  byte_length = 16
+}
+resource "random_id" "consul_acl_agent_token" {
+  byte_length = 16
 }
