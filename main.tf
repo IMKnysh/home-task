@@ -57,4 +57,5 @@ module "network" {
 module "tls" {
   source = "./20-tls"
   region = "${var.region}"
+  count_app_instances = "${var.count_app_instances}"
 }

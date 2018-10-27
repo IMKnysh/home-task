@@ -29,8 +29,46 @@ cat <<EOF > /opt/consul/config/server.json
   "verify_outgoing": true
 }
 EOF
+
+cat <<EOF > /opt/consul/config/acl.json
+{
+  "acl_datacenter": "${var.region}",
+  "acl_master_token": "${var.consul_acl_master_token}",
+  "acl_default_policy": "deny",
+  "acl_down_policy": "extend-cache",
+  "acl_agent_token": "${var.consul_acl_agent_token}"
+}
+EOF
+cat <<EOF > /opt/consul/agent.json
+{
+  "ID": "${var.consul_acl_agent_token}",
+  "Name": "Agent Token",
+  "Type": "client",
+  "Rules": "node \"\" { policy = \"write\" } service \"\" { policy = \"read\" } "
+}
+EOF
+
 echo "${var.ca_public_key}" > /opt/consul/tls/certs/ca-bundle.crt
-echo "${var.public_key_srv}" > /opt/consul/tls/certs/server.crt
+echo "${var.public_key}" > /opt/consul/tls/certs/server.crt
 echo "${var.private_key}" > /opt/consul/tls/private/my.key
 
+inst_IP=`curl --silent --show-error --location http://169.254.169.254/latest/meta-data/local-ipv4/`
+
 docker run -d --net=host --name=consul-server -v /opt/consul:/consul consul agent -server -client='{{ GetInterfaceIP "eth0" }}' -bind='{{ GetInterfaceIP "eth0" }}' -retry-join "provider=aws tag_key=Consul tag_value=Server"
+
+echo "Waiting consul to launch on 8500..."
+
+while ! nc -z $inst_IP 8500; do
+  sleep 10 # wait for 10 second before check again
+done
+
+curl \
+    --request PUT \
+    --header "X-Consul-Token: ${var.consul_acl_master_token}" \
+    --data \
+    '{
+  "ID": "${var.consul_acl_agent_token}",
+  "Name": "Agent Token",
+  "Type": "client",
+  "Rules": "node \"\" { policy = \"write\" } service \"\" { policy = \"read\" } "
+   }' http://$inst_IP:8500/v1/acl/create
