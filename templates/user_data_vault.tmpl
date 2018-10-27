@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+
+mkdir -p /opt/vault/config
+mkdir -p /opt/vault/tls/certs
+mkdir -p /opt/vault/tls/private
+
+
+inst_IP=`curl --silent --show-error --location http://169.254.169.254/latest/meta-data/local-ipv4/`
+
+cat <<EOF > /opt/vault/config/server.hcl
+ui = true
+listener "tcp" {
+  address = "127.0.0.1:8200"
+  tls_cert_file = "/vault/tls/certs/vault.crt"
+  tls_key_file  = "/vault/tls/private/vault.key"
+
+}
+
+listener "tcp" {
+  address = "$inst_IP:8200"
+  tls_cert_file = "/vault/tls/certs/vault.crt"
+  tls_key_file  = "/vault/tls/private/vault.key"
+}
+storage "consul" {
+  scheme        = "https"
+  address = "$inst_IP:8501"
+  tls_ca_file   = "/vault/tls/certs/ca-bundle.crt"
+  tls_cert_file = "/vault/tls/certs/server.crt"
+  tls_key_file  = "/vault/tls/private/vault.key"
+  token   = "${var.consul_acl_vault_token}"
+}
+# Advertise the non-loopback interface
+api_addr = "https://$inst_IP:8200"
+cluster_addr = "https://$inst_IP:8201"
+EOF
+
+
+echo "${var.ca_public_key}" > /opt/vault/tls/certs/ca-bundle.crt
+echo "${var.public_key}" > /opt/vault/tls/certs/server.crt
+echo "${var.private_key}" > /opt/vault/tls/private/vault.key
+echo "${var.public_key}" > /opt/vault/tls/certs/vault.crt
+echo "${var.ca_public_key}" >> /opt/vault/tls/certs/vault.crt
+
+docker run -d --net=host --cap-add=IPC_LOCK --name=vault-server -v /opt/vault:/vault vault server
+
+curl \
+    --request PUT \
+    --header "X-Consul-Token: ${var.consul_acl_master_token}" \
+    --data \
+    '{
+  "ID": "${var.consul_acl_vault_token}",
+  "Name": "Vault Token",
+  "Type": "client",
+  "Rules": "key \"vault/\" { policy = \"write\" } node \"\" { policy = \"write\" } service \"vault\" { policy = \"write\" } agent \"\" { policy = \"write\" } session \"\" { policy = \"write\" } "
+   }' http://$inst_IP:8500/v1/acl/create

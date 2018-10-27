@@ -40,7 +40,7 @@ module "tls_keys" {
 
 data "template_file" "consul" {
   count = "${var.count_app_instances}"
-  template = "${file("templates/user_data.tmpl")}"
+  template = "${file("templates/user_data_consul.tmpl")}"
   vars {
     var.count_srv = "${var.count_app_instances}"
     var.region = "${var.region}"
@@ -53,12 +53,32 @@ data "template_file" "consul" {
   }
 }
 
+data "template_file" "vault" {
+  count = "${var.count_app_instances}"
+  template = "${file("templates/user_data_vault.tmpl")}"
+  vars {
+    var.count_srv = "${var.count_app_instances}"
+    var.region = "${var.region}"
+    var.ca_public_key = "${module.tls.ca_public_key}"
+    var.public_key = "${element(module.tls_keys.public_key, count.index)}"
+    var.private_key = "${element(module.tls_keys.private_key, count.index)}"
+    var.consul_acl_master_token = "${random_id.consul_acl_master_token.b64_url}"
+    var.consul_acl_agent_token = "${random_id.consul_acl_agent_token.b64_url}"
+    var.consul_acl_vault_token = "${random_id.consul_acl_vault_token.b64_url}"
+  }
+}
+
 data "template_cloudinit_config" "user_data" {
   count = "${var.count_app_instances}"
   part {
     filename = "consul_run.sh"
     content_type = "text/x-shellscript"
     content = "${element(data.template_file.consul.*.rendered, count.index)}"
+  }
+  part {
+    filename = "vault_run.sh"
+    content_type = "text/x-shellscript"
+    content = "${element(data.template_file.vault.*.rendered, count.index)}"
   }
 }
 
@@ -115,5 +135,8 @@ resource "random_id" "consul_acl_master_token" {
   byte_length = 16
 }
 resource "random_id" "consul_acl_agent_token" {
+  byte_length = 16
+}
+resource "random_id" "consul_acl_vault_token" {
   byte_length = 16
 }
