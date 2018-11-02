@@ -15,7 +15,7 @@ resource "tls_cert_request" "cert" {
   private_key_pem = "${element(tls_private_key.cert.*.private_key_pem, count.index)}"
 
   dns_names    = ["ip-${replace(element(var.net_if_priv_ip, count.index ),"." , "-" )}.${var.region}.consul"]
-  ip_addresses = ["${element(var.net_if_priv_ip, count.index )}"]
+  ip_addresses = ["${element(var.net_if_priv_ip, count.index )}", "127.0.0.1"]
 
   subject {
     common_name  = "ip-${replace(element(var.net_if_priv_ip, count.index ),"." , "-" )}.${var.region}.consul"

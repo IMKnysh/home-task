@@ -15,9 +15,6 @@ variable "tagITA" {
 variable "project_name" {
   default = "HT"
 }
-variable "count_app_instances" {
-  default = "3"
-}
 
 variable "instance_type_default" {
   default = "t2.micro"
@@ -31,4 +28,16 @@ locals {
   common_tags = {
     Tag = "${var.tagITA}"
   }
+}
+variable "vault_srv" {
+  default = 2
+}
+variable "count_app_instances" {
+  default = "2"
+}
+variable "count_app" {
+  default = "1"
+}
+variable "nomad_ver" {
+  default = "0.8.6"
 }
