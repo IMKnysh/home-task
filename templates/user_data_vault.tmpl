@@ -86,7 +86,6 @@ if [[ $initialized_status == "false" ]]; then
       aws ssm put-parameter --name "/vault/unseal_key3" --value $unseal_key3 --type SecureString --overwrite
       aws ssm put-parameter --name "/vault/unseal_key4" --value $unseal_key4 --type SecureString --overwrite
       aws ssm put-parameter --name "/vault/unseal_key5" --value $unseal_key5 --type SecureString --overwrite
-  done
 fi
 
 
@@ -118,6 +117,28 @@ chmod a+x /opt/vault/unseal.sh
 cat <<EOF >> /var/spool/cron/root
 */30 * * * * /opt/vault/unseal.sh
 EOF
+
+cert_bundle=`cat /opt/vault/tls/certs/vault.crt`
+curl -H X-Vault-Token:$root_token --cacert /opt/vault/tls/certs/ca-bundle.crt --cert /opt/vault/tls/certs/server.crt --key /opt/vault/tls/private/vault.key --request POST --data '{"type": "pki"}'  https://$inst_IP:8200/v1/sys/mounts/pki
+curl -H X-Vault-Token:$root_token --cacert /opt/vault/tls/certs/ca-bundle.crt --cert /opt/vault/tls/certs/server.crt --key /opt/vault/tls/private/vault.key \
+     --request POST --data '{"certificate": "$(cat /opt/vault/tls/certs/vault.crt)"}'  https://$inst_IP:8200/v1/pki/intermediate/set-signed
+cat <<EOF > /root/config_pki.json
+{
+ "issuing_certificates": ["https://$inst_IP:8200/v1/pki/ca"],
+ "crl_distribution_points": ["http://$inst_IP:8200/v1/pki_int/crl"]
+}
+EOF
+curl -H X-Vault-Token:$root_token --cacert /opt/vault/tls/certs/ca-bundle.crt --cert /opt/vault/tls/certs/server.crt --key /opt/vault/tls/private/vault.key \
+     --request POST --data @/root/config_pki.json https://$inst_IP:8200/v1/pki/config/urls
+cat <<EOF >/root/pki_role.json
+{
+  "allowed_domains": ["consul","ec2.internal"],
+  "allow_subdomains": true
+}
+EOF
+curl -H X-Vault-Token:$root_token --cacert /opt/vault/tls/certs/ca-bundle.crt --cert /opt/vault/tls/certs/server.crt --key /opt/vault/tls/private/vault.key \
+     --request POST --data @/root/pki_role.json https://$inst_IP:8200/v1/pki/roles/nomad
+
 
 echo "#####################################################################"
 echo "Finished with Vault..."

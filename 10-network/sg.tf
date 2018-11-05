@@ -68,15 +68,15 @@ resource "aws_security_group" "intra" {
     self = true
   }
   ingress {
-    from_port = 8300
-    to_port = 8600
+    from_port = 0
+    to_port = 65535
     protocol = "tcp"
     self = true
     security_groups = ["${aws_security_group.bastion_sg.id}"]
   }
   ingress {
-    from_port = 8300
-    to_port = 8600
+    from_port = 0
+    to_port = 65535
     protocol = "udp"
     self = true
   }

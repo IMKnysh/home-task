@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+
+
+echo "#####################################################################"
+echo "Install and configure Nomad"
+echo "#####################################################################"
+
+mkdir -p /opt/nomad/config
+mkdir -p /opt/nomad/tls/certs
+mkdir -p /opt/nomad/tls/private
+
+export AWS_DEFAULT_REGION=${var.region}
+
+cat <<EOF > /opt/nomad/config/client.hcl
+
+data_dir  = "/opt/nomad"
+
+bind_addr = "$inst_IP"
+datacenter = "${var.region}"
+tls {
+  http = true
+  rpc  = true
+
+  ca_file   = "/opt/nomad/tls/certs/ca-bundle.crt"
+  cert_file = "/opt/nomad/tls/certs/server.crt"
+  key_file  = "/opt/nomad/tls/private/vault.key"
+  }
+client {
+  enabled = true
+  server_join {
+    retry_join = [ "provider=aws tag_key=Consul tag_value=Server" ]
+    retry_max = 3
+    retry_interval = "15s"
+  }
+}
+
+consul {
+  address             = "$inst_IP:8501"
+  client_service_name = "nomad-client"
+  auto_advertise      = true
+  server_auto_join    = true
+  client_auto_join    = true
+  ssl       = true
+  ca_file   = "/opt/nomad/tls/certs/ca-bundle.crt"
+  cert_file = "/opt/nomad/tls/certs/server.crt"
+  key_file  = "/opt/nomad/tls/private/vault.key"
+}
+vault {
+  enabled = true
+  address = "https://$inst_IP:8200"
+  ca_file   = "/opt/nomad/tls/certs/ca-bundle.crt"
+  cert_file = "/opt/nomad/tls/certs/server.crt"
+  key_file  = "/opt/nomad/tls/private/vault.key"
+  token       = "$NOMAD_ROLE_TOKEN"
+  create_from_role = "nomad-cluster"
+}
+EOF
+
+
+# Download Nomad
+NOMAD_VERSION="${var.nomad_ver}"
+
+echo "Fetching Nomad..."
+cd /tmp/
+curl -sSL https://releases.hashicorp.com/nomad/$${NOMAD_VERSION}/nomad_$${NOMAD_VERSION}_linux_amd64.zip -o nomad.zip
+
+echo "Installing Nomad..."
+unzip nomad.zip
+install nomad /usr/bin/nomad
+
+nomad agent -config=/opt/nomad/config >> /var/log/nomad.log &&
+
+echo "#####################################################################"
+echo "Finished with Nomad"
+echo "#####################################################################"

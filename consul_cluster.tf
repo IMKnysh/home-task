@@ -54,6 +54,15 @@ module "tls_keys_vault" {
   tls_self_signed_cert_ca_cert_pem = "${module.tls.tls_self_signed_cert_ca_cert_pem}"
   net_if_priv_ip = "${aws_network_interface.net_if.*.private_ip}"
 }
+module "tls_keys_nomad" {
+  source = "./20-tls-key"
+  region = "${var.region}"
+  count_app_instances = "${var.vault_srv}"
+  tls_private_key_ca_algorithm = "${module.tls.tls_private_key_ca_algorithm}"
+  tls_private_key_ca_private_key_pem = "${module.tls.tls_private_key_ca_private_key_pem}"
+  tls_self_signed_cert_ca_cert_pem = "${module.tls.tls_self_signed_cert_ca_cert_pem}"
+  net_if_priv_ip = "${aws_network_interface.net_if.*.private_ip}"
+}
 
 data "template_file" "consul" {
   count = "${var.count_app_instances}"
@@ -90,8 +99,8 @@ data "template_file" "nomad" {
     var.count_srv = "${var.vault_srv}"
     var.region = "${var.region}"
     var.ca_public_key = "${module.tls.ca_public_key}"
-    var.public_key = "${element(module.tls_keys_vault.public_key, count.index)}"
-    var.private_key = "${element(module.tls_keys_vault.private_key, count.index)}"
+    var.public_key = "${element(module.tls_keys_nomad.public_key, count.index)}"
+    var.private_key = "${element(module.tls_keys_nomad.private_key, count.index)}"
     var.consul_acl_master_token = "${random_id.consul_acl_master_token.b64_url}"
     var.consul_acl_vault_token = "${random_id.consul_acl_vault_token.b64_url}"
     var.nomad_ver = "${var.nomad_ver}"
