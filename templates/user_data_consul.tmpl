@@ -10,6 +10,24 @@ mkdir -p /opt/consul/config
 mkdir -p /opt/consul/tls/certs
 mkdir -p /opt/consul/tls/private
 
+inst_IP=`curl --silent --show-error --location http://169.254.169.254/latest/meta-data/local-ipv4/`
+
+#################Configuring IPTABLES###################
+iptables -t nat -A PREROUTING -p udp -m udp --dport 53 -j REDIRECT --to-ports 8600
+iptables -t nat -A PREROUTING -p tcp -m tcp --dport 53 -j REDIRECT --to-ports 8600
+iptables -t nat -A OUTPUT -d localhost -p udp -m udp --dport 53 -j REDIRECT --to-ports 8600
+iptables -t nat -A OUTPUT -d localhost -p tcp -m tcp --dport 53 -j REDIRECT --to-ports 8600
+
+################# Configuring DNS resolver##############
+dns_server=$(cat /etc/resolv.conf |grep -i -m 1 '^nameserver'|cut -d ' ' -f2)
+cat <<EOF > /etc/resolv.conf
+search ec2.internal
+options timeout:2 attempts:5
+nameserver $inst_IP
+nameserver $dns_server
+EOF
+
+#################Configuring Consul#####################
 cat <<EOF > /opt/consul/config/server.json
 {
   "datacenter": "${var.region}",
@@ -20,6 +38,7 @@ cat <<EOF > /opt/consul/config/server.json
   "bootstrap_expect": ${var.count_srv},
   "skip_leave_on_interrupt": true,
   "ui": true,
+  "recursors" : [ "$dns_server" ],
   "ports": {
     "https": 8501
   },
@@ -53,7 +72,7 @@ echo "${var.ca_public_key}" > /opt/consul/tls/certs/ca-bundle.crt
 echo "${var.public_key}" > /opt/consul/tls/certs/server.crt
 echo "${var.private_key}" > /opt/consul/tls/private/my.key
 
-inst_IP=`curl --silent --show-error --location http://169.254.169.254/latest/meta-data/local-ipv4/`
+
 
 docker run -d --restart always --net=host --name=consul-server -v /opt/consul:/consul consul agent -server -client='{{ GetInterfaceIP "eth0" }}' -bind='{{ GetInterfaceIP "eth0" }}' -retry-join "provider=aws tag_key=Consul tag_value=Server"
 
@@ -73,6 +92,17 @@ curl \
   "Type": "client",
   "Rules": "node \"\" { policy = \"write\" } service \"\" { policy = \"read\" } "
    }' http://$inst_IP:8500/v1/acl/create
+
+curl \
+    --request PUT \
+    --header "X-Consul-Token: ${var.consul_acl_master_token}" \
+    --data \
+    '{
+  "ID": "00000000-0000-0000-0000-000000000002",
+  "Name": "Anonymous Token",
+  "Type": "client",
+  "Rules": "service \"consul\" { policy = \"read\" } "
+   }' http://$inst_IP:8500/v1/acl/update
 
 echo "#####################################################################"
 echo "Finished with Consul..."

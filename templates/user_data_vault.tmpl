@@ -41,7 +41,7 @@ echo "${var.private_key}" > /opt/vault/tls/private/vault.key
 echo "${var.public_key}" > /opt/vault/tls/certs/vault.crt
 echo "${var.ca_public_key}" >> /opt/vault/tls/certs/vault.crt
 
-docker run -d --restart always --net=host --cap-add=IPC_LOCK --name=vault-server -v /opt/vault:/vault vault server -log-level=debug
+docker run -d --restart always --net=host --cap-add=IPC_LOCK --name=vault-server -v /opt/vault:/vault vault server
 
 yum install -y jq
 

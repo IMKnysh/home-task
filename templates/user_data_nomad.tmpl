@@ -33,6 +33,32 @@ curl $CURL_OPT https://$inst_IP:8200/v1/sys/policy/nomad-server \
 curl $CURL_OPT https://$inst_IP:8200/v1/sys/policy/nomad-server \
   -d '{"rules":"path \"auth/token/renew-self\" {\n  capabilities = [\"update\"]\n}"}'
 
+cat <<EOF > /root/vault_policy_nomad.hcl
+path "auth/token/create/nomad-cluster" {
+  capabilities = ["update"]
+}
+path "auth/token/roles/nomad-cluster" {
+  capabilities = ["read"]
+}
+path "auth/token/lookup-self" {
+  capabilities = ["read"]
+}
+path "auth/token/lookup" {
+  capabilities = ["update"]
+}
+path "auth/token/revoke-accessor" {
+  capabilities = ["update"]
+}
+path "sys/capabilities-self" {
+  capabilities = ["update"]
+}
+path "auth/token/renew-self" {
+  capabilities = ["update"]
+}
+EOF
+
+curl $CURL_OPT https://$inst_IP:8200/v1/sys/policy/nomad-server \
+  -d @/root/vault_policy_nomad.hcl
 cat <<EOF > /root/vault_role.json
 {
   "disallowed_policies": "nomad-server",
@@ -57,7 +83,7 @@ EOF
 curl $CURL_OPT --data @/root/nomad_token.json https://$inst_IP:8200/v1/auth/token/create | tee \
        >(jq -r .auth.client_token > /root/nomad_role_token) \
 
-NOMAD_ROLE_TOKEN='cat /root/nomad_role_token'
+NOMAD_ROLE_TOKEN=`cat /root/nomad_role_token`
 aws ssm put-parameter --name "/vault/nomad_role_token" --value $NOMAD_ROLE_TOKEN --type SecureString --overwrite
 
 ###1NOMAD_ROLE_TOKEN=$VAULT_TOKEN
