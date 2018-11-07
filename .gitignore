@@ -7,3 +7,4 @@
 
 # .tfvars files
 *.tfvars
+if_ip_block.txt

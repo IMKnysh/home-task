@@ -45,7 +45,7 @@ module "network" {
   source = "./10-network"
   tagITA = "${var.tagITA}"
   project_name = "${var.project_name}"
-  vpc_zones = ["${data.aws_availability_zones.available.names}"]
+  vpc_zones = ["us-east-1a"]
   count_app_instances = "${var.count_app_instances}"
   vpc_cidr = "${var.vpc_cidr}"
   count = "${var.count}"
