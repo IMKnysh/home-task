@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+
+yum update -y
+yum install -y docker
+
+
+usermod -a -G docker ec2-user
+service docker start
+mkdir -p /opt/consul/config
+mkdir -p /opt/consul/tls/certs
+mkdir -p /opt/consul/tls/private
+
+cat <<EOF > /opt/consul/config/client.json
+{
+  "datacenter": "${var.region}",
+  "data_dir": "/consul/data/",
+  "log_level": "INFO",
+  "server": false,
+  "encrypt": "${var.consul_encrypt}",
+  "skip_leave_on_interrupt": true,
+  "ui": true,
+  "ports": {
+    "https": 8501
+  },
+  "key_file": "/consul/tls/private/my.key",
+  "cert_file": "/consul/tls/certs/server.crt",
+  "ca_file": "/consul/tls/certs/ca-bundle.crt",
+  "verify_incoming": true,
+  "verify_outgoing": true
+}
+EOF
+
+cat <<EOF > /opt/consul/config/acl.json
+{
+  "acl_datacenter": "${var.region}",
+  "acl_master_token": "${var.consul_acl_master_token}",
+  "acl_default_policy": "deny",
+  "acl_down_policy": "extend-cache",
+  "acl_agent_token": "${var.consul_acl_agent_token}"
+}
+EOF
+
+echo "${var.ca_public_key}" > /opt/consul/tls/certs/ca-bundle.crt
+echo "${var.public_key}" > /opt/consul/tls/certs/server.crt
+echo "${var.private_key}" > /opt/consul/tls/private/my.key
+
+inst_IP=`curl --silent --show-error --location http://169.254.169.254/latest/meta-data/local-ipv4/`
+
+docker run -d --restart always --net=host --name=consul-client -v /opt/consul:/consul consul agent -bind='{{ GetInterfaceIP "eth0" }}' -retry-join "provider=aws tag_key=Consul tag_value=Server"
+
+echo "Waiting consul to launch on 8500..."
+
+
+echo "#####################################################################"
+echo "Finished with Consul..."
+echo "#####################################################################"

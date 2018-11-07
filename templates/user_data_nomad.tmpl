@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+
+mkdir -p /opt/nomad/config
+mkdir -p /opt/nomad/tls/certs
+mkdir -p /opt/nomad/tls/private
+
+echo "${var.ca_public_key}" > /opt/nomad/tls/certs/ca-bundle.crt
+echo "${var.public_key}" > /opt/nomad/tls/certs/server.crt
+echo "${var.private_key}" > /opt/nomad/tls/private/nomad.key
+
+export AWS_DEFAULT_REGION=${var.region}
+
+VAULT_TOKEN=$(aws ssm get-parameter --name "/vault/root_token" --with-decryption | jq -r .Parameter.Value)
+
+CURL_OPT="-H X-Vault-Token:$VAULT_TOKEN --cacert /opt/nomad/tls/certs/ca-bundle.crt --cert /opt/nomad/tls/certs/server.crt --key /opt/nomad/tls/private/nomad.key -X POST"
+
+inst_IP=$(curl --silent --show-error --location http://169.254.169.254/latest/meta-data/local-ipv4/)
+
+curl $CURL_OPT https://$inst_IP:8200/v1/sys/policy/nomad-server \
+  -d '{"rules":"path \"auth/token/create/nomad-cluster\" {\n  capabilities = [\"update\"]\n}"}'
+
+curl $CURL_OPT https://$inst_IP:8200/v1/sys/policy/nomad-server \
+  -d '{"rules":"path \"auth/token/roles/nomad-cluster\" {\n  capabilities = [\"read\"]\n}"}'
+
+curl $CURL_OPT https://$inst_IP:8200/v1/sys/policy/nomad-server \
+  -d '{"rules":"path \"auth/token/lookup-self\" {\n  capabilities = [\"read\"]\n}"}'
+curl $CURL_OPT https://$inst_IP:8200/v1/sys/policy/nomad-server \
+  -d '{"rules":"path \"auth/token/lookup\" {\n  capabilities = [\"update\"]\n}"}'
+curl $CURL_OPT https://$inst_IP:8200/v1/sys/policy/nomad-server \
+  -d '{"rules":"path \"auth/token/revoke-accessor\" {\n  capabilities = [\"update\"]\n}"}'
+curl $CURL_OPT https://$inst_IP:8200/v1/sys/policy/nomad-server \
+  -d '{"rules":"path \"sys/capabilities-self\" {\n  capabilities = [\"update\"]\n}"}'
+curl $CURL_OPT https://$inst_IP:8200/v1/sys/policy/nomad-server \
+  -d '{"rules":"path \"auth/token/renew-self\" {\n  capabilities = [\"update\"]\n}"}'
+
+cat <<EOF > /root/vault_policy_nomad.hcl
+path "auth/token/create/nomad-cluster" {
+  capabilities = ["update"]
+}
+path "auth/token/roles/nomad-cluster" {
+  capabilities = ["read"]
+}
+path "auth/token/lookup-self" {
+  capabilities = ["read"]
+}
+path "auth/token/lookup" {
+  capabilities = ["update"]
+}
+path "auth/token/revoke-accessor" {
+  capabilities = ["update"]
+}
+path "sys/capabilities-self" {
+  capabilities = ["update"]
+}
+path "auth/token/renew-self" {
+  capabilities = ["update"]
+}
+EOF
+
+curl $CURL_OPT https://$inst_IP:8200/v1/sys/policy/nomad-server \
+  -d @/root/vault_policy_nomad.hcl
+cat <<EOF > /root/vault_role.json
+{
+  "disallowed_policies": "nomad-server",
+  "explicit_max_ttl": 0,
+  "name": "nomad-cluster",
+  "orphan": true,
+  "period": 259200,
+  "renewable": true
+}
+EOF
+curl $CURL_OPT --data @/root/vault_role.json https://$inst_IP:8200/v1/auth/token/roles/nomad-cluster
+
+cat <<EOF > /root/nomad_token.json
+{
+  "policies": [
+    "nomad-server"
+  ],
+  "ttl": "72h",
+  "renewable": true
+}
+EOF
+curl $CURL_OPT --data @/root/nomad_token.json https://$inst_IP:8200/v1/auth/token/create | tee \
+       >(jq -r .auth.client_token > /root/nomad_role_token) \
+
+NOMAD_ROLE_TOKEN=`cat /root/nomad_role_token`
+aws ssm put-parameter --name "/vault/nomad_role_token" --value $NOMAD_ROLE_TOKEN --type SecureString --overwrite
+
+###1NOMAD_ROLE_TOKEN=$VAULT_TOKEN
+
+cat <<EOF > /opt/nomad/config/server.hcl
+
+data_dir  = "/var/lib/nomad"
+
+bind_addr = "$inst_IP"
+datacenter = "${var.region}"
+server {
+  enabled          = true
+  bootstrap_expect = ${var.count_srv}
+  server_join {
+   retry_join = [ "provider=aws tag_key=Consul tag_value=Server" ]
+  }
+}
+
+tls {
+  http = false
+  rpc  = true
+
+  ca_file   = "/opt/nomad/tls/certs/ca-bundle.crt"
+  cert_file = "/opt/nomad/tls/certs/server.crt"
+  key_file  = "/opt/nomad/tls/private/nomad.key"}
+
+consul {
+  address             = "$inst_IP:8501"
+  server_service_name = "nomad"
+  client_service_name = "nomad-client"
+  auto_advertise      = true
+  server_auto_join    = true
+  client_auto_join    = true
+  ssl       = true
+  ca_file   = "/opt/nomad/tls/certs/ca-bundle.crt"
+  cert_file = "/opt/nomad/tls/certs/server.crt"
+  key_file  = "/opt/nomad/tls/private/nomad.key"
+  token     = "${var.consul_acl_master_token}"
+}
+vault {
+  enabled = true
+  address = "https://$inst_IP:8200"
+  ca_file   = "/opt/nomad/tls/certs/ca-bundle.crt"
+  cert_file = "/opt/nomad/tls/certs/server.crt"
+  key_file  = "/opt/nomad/tls/private/nomad.key"
+  token       = "$NOMAD_ROLE_TOKEN"
+  create_from_role = "nomad-cluster"
+}
+EOF
+
+
+# Download Nomad
+NOMAD_VERSION="${var.nomad_ver}"
+
+echo "Fetching Nomad..."
+cd /tmp/
+curl -sSL https://releases.hashicorp.com/nomad/$${NOMAD_VERSION}/nomad_$${NOMAD_VERSION}_linux_amd64.zip -o nomad.zip
+
+echo "Installing Nomad..."
+unzip nomad.zip
+install nomad /usr/bin/nomad
+
+nomad agent -config=/opt/nomad/config 2>&1 >> /var/log/nomad.log &
+
+echo "#####################################################################"
+echo "Finished with Nomad"
+echo "#####################################################################"

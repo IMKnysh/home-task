@@ -64,6 +64,7 @@ resource "aws_route_table_association" "def_igw" {
   subnet_id = "${element(aws_subnet.public_net.*.id, count.index)}"
 }
 
+/*
 resource "aws_eip" "nat" {
   vpc = true
   instance = "${aws_instance.bastion.id}"
@@ -74,7 +75,7 @@ resource "aws_eip" "nat" {
     )
   )}"
 }
-
+*/
 resource "aws_route_table" "def_private" {
   vpc_id = "${aws_vpc.kim_vpc.id}"
   route {

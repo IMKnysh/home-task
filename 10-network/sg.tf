@@ -8,6 +8,18 @@ resource "aws_security_group" "bastion_sg" {
     to_port = 22
     cidr_blocks = ["0.0.0.0/0"]
   }
+  ingress {
+    from_port = 443
+    protocol = "tcp"
+    to_port = 443
+    cidr_blocks = [ "${file("if_ip_block.txt")}"]
+  }
+  ingress {
+    from_port = 80
+    protocol = "tcp"
+    to_port = 80
+    cidr_blocks = [ "${file("if_ip_block.txt")}"]
+  }
 
   egress {
     from_port = 0
@@ -68,15 +80,15 @@ resource "aws_security_group" "intra" {
     self = true
   }
   ingress {
-    from_port = 8300
-    to_port = 8600
+    from_port = 0
+    to_port = 65535
     protocol = "tcp"
     self = true
     security_groups = ["${aws_security_group.bastion_sg.id}"]
   }
   ingress {
-    from_port = 8300
-    to_port = 8600
+    from_port = 0
+    to_port = 65535
     protocol = "udp"
     self = true
   }
