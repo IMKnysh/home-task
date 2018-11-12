@@ -25,3 +25,6 @@ output "private_subnet_id" {
 output "nat_id" {
   value = "${aws_instance.bastion.id}"
 }
+output "bastion_ip" {
+  value = "${aws_instance.bastion.public_ip}"
+}

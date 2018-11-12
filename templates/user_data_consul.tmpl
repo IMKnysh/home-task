@@ -59,14 +59,6 @@ cat <<EOF > /opt/consul/config/acl.json
   "acl_agent_token": "${var.consul_acl_agent_token}"
 }
 EOF
-cat <<EOF > /opt/consul/agent.json
-{
-  "ID": "${var.consul_acl_agent_token}",
-  "Name": "Agent Token",
-  "Type": "client",
-  "Rules": "node \"\" { policy = \"write\" } service \"\" { policy = \"read\" } "
-}
-EOF
 
 echo "${var.ca_public_key}" > /opt/consul/tls/certs/ca-bundle.crt
 echo "${var.public_key}" > /opt/consul/tls/certs/server.crt

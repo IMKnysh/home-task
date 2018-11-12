@@ -41,3 +41,19 @@ variable "count_app" {
 variable "nomad_ver" {
   default = "0.8.6"
 }
+variable "chef_server" {
+  default = "https://test-chef-dwsvlc2iyxni6cld.us-east-1.opsworks-cm.io/organizations/default"
+}
+variable "chef_client_name" {
+  default = "test"
+}
+variable "chef_key_file" {
+  default = "c:/users/igor.knysh/.chef/private.pem"
+}
+variable "ssh_bastion_key" {
+  default = "C:/Work/DevOps/AWS/free/my-east.pem"
+}
+variable "run_list" {
+  default = ["recipe[consul-chef::consul]"]
+  type = "list"
+}

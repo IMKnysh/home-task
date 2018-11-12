@@ -3,7 +3,8 @@ resource "aws_instance" "consul" {
   instance_type = "${var.instance_type_default}"
   count = "${var.count_app_instances}"
   key_name = "${var.key_name}"
-  user_data = "${element(data.template_cloudinit_config.user_data.*.rendered, count.index)}"
+#  user_data = "${element(data.template_cloudinit_config.user_data.*.rendered, count.index)}"
+  user_data = "yum -y update"
   depends_on = ["module.network"]
   iam_instance_profile = "${aws_iam_instance_profile.ec2_descr_profile.name}"
   network_interface {
@@ -203,4 +204,57 @@ resource "random_id" "consul_acl_agent_token" {
 }
 resource "random_id" "consul_acl_vault_token" {
   byte_length = 16
+}
+
+data "template_file" "node_attributes" {
+  count = "${var.count_app_instances}"
+  template = <<EOF
+    {
+      "certs": {
+        "ca":${module.tls.ca_public_key},
+        "certificate":${jsonencode(element(module.tls_keys.public_key, count.index))},
+        "key":${jsonencode(element(module.tls_keys.private_key, count.index))}
+      }
+      "consul": {
+        "encrypt":"${random_id.consul_encrypt.b64_std}",
+        "region": "${var.region}",
+        "count": "${var.count_app_instances}",
+        "acl_master_token": "${random_id.consul_acl_master_token.b64_url}",
+        "acl_agent_token": "${random_id.consul_acl_agent_token.b64_url}"
+      }
+
+
+    }
+EOF
+}
+
+resource "null_resource" "chef" {
+  count = "${var.count_app_instances}"
+
+  connection {
+
+    agent = true
+    bastion_host = "${module.network.bastion_ip}"
+    bastion_user = "ec2-user"
+    bastion_private_key = "${var.ssh_bastion_key}"
+    user = "ec2-user"
+    host = "${element(aws_instance.consul.*.private_ip, count.index)}"
+    timeout = "10m"
+  }
+
+  triggers {
+    instance_id = "${element(aws_instance.consul.*.id, count.index)}"
+    attributes_change = "${md5(element(data.template_file.node_attributes.*.rendered, count.index))}"
+  }
+
+  provisioner "chef" {
+    node_name = "$name-${element(aws_instance.consul.*.private_ip, count.index)}"
+    server_url = "${var.chef_server}"
+    run_list = ["recipe[consul-chef::consul]"]
+    fetch_chef_certificates = true
+    user_name = "${var.chef_client_name}"
+    user_key = "${file(var.chef_key_file)}"
+    recreate_client = true
+    attributes_json = "${element(data.template_file.node_attributes.*.rendered, count.index)}"
+  }
 }
